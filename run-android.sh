@@ -33,28 +33,29 @@ fi
 echo "==> Installing JS deps"
 npm install --legacy-peer-deps
 
-# Start Metro in the background if not already listening on port 8081.
+# Always restart Metro with a clean cache to prevent stale JS bundles.
 # We manage Metro ourselves with --no-packager to avoid the RN CLI bug on
 # Linux where the default --terminal xterm-kitty isn't a real binary: execa
 # throws, the fallback runs Metro synchronously, and run-android never
 # reaches the Gradle build.
 if nc -z localhost 8081 2>/dev/null; then
-  echo "==> Metro already running on :8081"
-else
-  echo "==> Starting Metro bundler in background…"
-  npx react-native start > /tmp/metro.log 2>&1 &
-  METRO_PID=$!
-  echo "==> Waiting for Metro to accept connections on :8081…"
-  until nc -z localhost 8081 2>/dev/null; do
-    sleep 1
-    # Bail if Metro died before it was ready
-    if ! kill -0 "$METRO_PID" 2>/dev/null; then
-      echo "ERROR: Metro (PID $METRO_PID) exited before becoming ready. Check /tmp/metro.log"
-      exit 1
-    fi
-  done
-  echo "==> Metro is ready (PID $METRO_PID, log: /tmp/metro.log)"
+  echo "==> Killing existing Metro on :8081…"
+  fuser -k 8081/tcp 2>/dev/null || true
+  sleep 1
 fi
+
+echo "==> Starting Metro bundler (--reset-cache)…"
+npx react-native start --reset-cache > /tmp/metro.log 2>&1 &
+METRO_PID=$!
+echo "==> Waiting for Metro to accept connections on :8081…"
+until nc -z localhost 8081 2>/dev/null; do
+  sleep 1
+  if ! kill -0 "$METRO_PID" 2>/dev/null; then
+    echo "ERROR: Metro (PID $METRO_PID) exited before becoming ready. Check /tmp/metro.log"
+    exit 1
+  fi
+done
+echo "==> Metro is ready (PID $METRO_PID, log: /tmp/metro.log)"
 
 echo "==> Building, installing, and starting app (Ctrl+C to stop)"
 npx react-native run-android --no-packager

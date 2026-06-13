@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -57,6 +58,7 @@ export default function RawJsonScreen({onBack}: Props) {
   const [selected, setSelected] = useState<Endpoint>(ENDPOINTS[0]!);
   const [customUrl, setCustomUrl] = useState('');
   const [spoofUa, setSpoofUa] = useState(false);
+  const [useAlphaHost, setUseAlphaHost] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -84,7 +86,10 @@ export default function RawJsonScreen({onBack}: Props) {
   };
 
   const runFetch = async () => {
-    const target = customUrl.trim() || selected.url;
+    const raw = customUrl.trim() || selected.url;
+    const target = useAlphaHost
+      ? raw.replace('vercel.bhenning.com', 'nextjs-website-alpha-weld.vercel.app')
+      : raw;
     if (customUrl.trim()) {
       try {
         new URL(customUrl.trim());
@@ -166,12 +171,25 @@ export default function RawJsonScreen({onBack}: Props) {
           autoCorrect={false}
         />
 
-        <Pressable style={styles.toggleRow} onPress={() => setSpoofUa(v => !v)}>
-          <View style={[styles.checkbox, spoofUa && styles.checkboxChecked]}>
-            {spoofUa && <Text style={styles.checkmark}>✓</Text>}
-          </View>
+        <View style={styles.toggleRow}>
+          <Switch
+            value={spoofUa}
+            onValueChange={setSpoofUa}
+            trackColor={{false: COLORS.border, true: COLORS.accent}}
+            thumbColor={COLORS.text}
+          />
           <Text style={styles.toggleLabel}>UA: PhantomJS/react-native/brian (test)</Text>
-        </Pressable>
+        </View>
+
+        <View style={styles.toggleRow}>
+          <Switch
+            value={useAlphaHost}
+            onValueChange={setUseAlphaHost}
+            trackColor={{false: COLORS.border, true: COLORS.accent}}
+            thumbColor={COLORS.text}
+          />
+          <Text style={styles.toggleLabel}>Override: nextjs-website-alpha-weld.vercel.app</Text>
+        </View>
 
         <TouchableOpacity style={styles.fetchButton} onPress={runFetch} disabled={loading}>
           <Text style={styles.fetchButtonText}>
@@ -214,11 +232,11 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
   backIcon: {
-    fontSize: 24,
+    fontSize: 32,
     color: COLORS.text,
     fontWeight: '600',
   },

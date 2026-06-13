@@ -9,10 +9,10 @@ MODE="${1:-dev}"   # dev | build
 echo "==> Installing JS deps"
 npm install --legacy-peer-deps
 
-if [[ "$MODE" == "build" ]]; then
-  echo "==> Building production bundle → dist/"
-  npm run web:build
-else
+echo "==> Building bundle → dist/"
+npm run web:build
+
+if [[ "$MODE" != "build" ]]; then
   echo "==> Starting webpack dev server at http://localhost:8080"
   npm run web
 fi
