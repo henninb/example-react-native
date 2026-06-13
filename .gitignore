@@ -1,0 +1,32 @@
+node_modules/
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/build/
+android/local.properties
+
+# iOS build artifacts
+ios/build/
+ios/Pods/
+ios/.xcode.env.local
+ios/DerivedData/
+
+# Web/dist build output
+dist/
+
+# Metro bundler cache
+.metro-health-check-*
+.bundle/
+
+# Watchman
+.watchmanconfig
+
+# Ruby
+vendor/bundle/
+.bundle/
+
+# Misc
+.DS_Store
+*.log
