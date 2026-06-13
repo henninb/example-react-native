@@ -72,8 +72,12 @@ export default function HomeScreen({onNavigateToRaw}: Props) {
           <Text style={styles.titleIcon}>🛡️</Text>
           <Text style={styles.title}>Weather</Text>
         </View>
+        <View style={styles.domainRow}>
+          <Text style={styles.domainCheck}>✓</Text>
+          <Text style={styles.domainLabel}>nextjs-website-alpha-weld.vercel.app</Text>
+        </View>
         <Text style={styles.subtitle}>
-          Live station observation from vercel.bhenning.com
+          Live station observation
         </Text>
 
         <View style={styles.toggleCard}>
@@ -194,6 +198,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
     letterSpacing: -0.3,
+  },
+  domainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  domainCheck: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#22c55e',
+    marginRight: 6,
+  },
+  domainLabel: {
+    fontSize: 13,
+    fontFamily: 'monospace',
+    color: COLORS.accent,
   },
   subtitle: {
     fontSize: 13,
