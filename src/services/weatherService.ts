@@ -12,7 +12,7 @@ export interface Observation {
 }
 
 export const WEATHER_HOST = 'vercel.bhenning.com';
-export const WEATHER_ALPHA_HOST = 'nextjs-website-alpha-weld.vercel.app';
+export const WEATHER_ALPHA_HOST = 'bookkeeper.bhenning.com';
 
 export interface WeatherFetchResult {
   status: number;

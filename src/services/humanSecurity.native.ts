@@ -6,7 +6,7 @@ import {PX_APP_ID} from '../config/appId';
 let started = false;
 
 const WEB_ROOT_DOMAINS = {
-  [PX_APP_ID]: ['vercel.bhenning.com', 'nextjs-website-alpha-weld.vercel.app'],
+  [PX_APP_ID]: ['vercel.bhenning.com', 'bookkeeper.bhenning.com'],
 };
 
 export async function ensureHumanSdkStarted(): Promise<void> {
