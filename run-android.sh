@@ -66,6 +66,11 @@ if ! "$ADB" devices | grep -q "emulator.*device"; then
     sleep 2
   done
 
+  echo "==> Waiting for package manager service…"
+  until "$ADB" shell pm list packages > /dev/null 2>&1; do
+    sleep 2
+  done
+
   "$ADB" shell input keyevent 82   # unlock screen
   sleep 1
 fi
@@ -96,6 +101,14 @@ until port_in_use 8081; do
   fi
 done
 echo "==> Metro is ready (PID $METRO_PID, log: /tmp/metro.log)"
+
+echo "==> Checking emulator storage…"
+AVAIL_KB=$("$ADB" shell df /data 2>/dev/null | awk 'NR==2 {print $4}')
+if [[ -n "$AVAIL_KB" && "$AVAIL_KB" -lt 524288 ]]; then
+  echo "==> Low storage (${AVAIL_KB}KB free) — clearing caches…"
+  "$ADB" shell pm clear com.android.providers.downloads > /dev/null 2>&1 || true
+  "$ADB" shell pm clear com.google.android.gms > /dev/null 2>&1 || true
+fi
 
 echo "==> Building, installing, and starting app (Ctrl+C to stop)"
 npx react-native run-android --no-packager
