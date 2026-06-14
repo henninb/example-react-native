@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {fetchPublicIp, fetchUrl} from '../services/weatherService';
+import {fetchPublicIp, fetchUrl, WEATHER_ALPHA_HOST, WEATHER_HOST} from '../services/weatherService';
 import {PX_APP_ID} from '../config/appId';
 
 const COLORS = {
@@ -39,7 +39,7 @@ const ENDPOINTS: Endpoint[] = [
   {
     id: 'weather',
     label: 'Weather (demo)',
-    url: 'https://vercel.bhenning.com/api/weather',
+    url: `https://${WEATHER_HOST}/api/weather`,
     description: 'Station observation JSON from bhenning.com.',
   },
   {
@@ -88,7 +88,7 @@ export default function RawJsonScreen({onBack}: Props) {
   const runFetch = async () => {
     const raw = customUrl.trim() || selected.url;
     const target = useAlphaHost
-      ? raw.replace('vercel.bhenning.com', 'nextjs-website-alpha-weld.vercel.app')
+      ? raw.replace(WEATHER_HOST, WEATHER_ALPHA_HOST)
       : raw;
     if (customUrl.trim()) {
       try {
@@ -188,7 +188,7 @@ export default function RawJsonScreen({onBack}: Props) {
             trackColor={{false: COLORS.border, true: COLORS.accent}}
             thumbColor={COLORS.text}
           />
-          <Text style={styles.toggleLabel}>Override: nextjs-website-alpha-weld.vercel.app</Text>
+          <Text style={styles.toggleLabel}>Override: {WEATHER_ALPHA_HOST}</Text>
         </View>
 
         <TouchableOpacity style={styles.fetchButton} onPress={runFetch} disabled={loading}>

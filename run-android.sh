@@ -4,11 +4,51 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-ANDROID_SDK="${ANDROID_HOME:-$HOME/Android/Sdk}"
+resolve_android_sdk() {
+  if [[ -n "${ANDROID_HOME:-}" ]]; then
+    printf '%s\n' "$ANDROID_HOME"
+  elif [[ -n "${ANDROID_SDK_ROOT:-}" ]]; then
+    printf '%s\n' "$ANDROID_SDK_ROOT"
+  elif [[ "$(uname -s)" == "Darwin" ]]; then
+    printf '%s\n' "$HOME/Library/Android/sdk"
+  else
+    printf '%s\n' "$HOME/Android/Sdk"
+  fi
+}
+
+port_in_use() {
+  nc -z localhost "$1" 2>/dev/null
+}
+
+kill_port() {
+  local port=$1
+  local pids
+  pids=$(lsof -ti:"$port" 2>/dev/null || true)
+  if [[ -n "$pids" ]]; then
+    # shellcheck disable=SC2086
+    kill -9 $pids 2>/dev/null || true
+  fi
+}
+
+ANDROID_SDK="$(resolve_android_sdk)"
 ADB="$ANDROID_SDK/platform-tools/adb"
 EMULATOR="$ANDROID_SDK/emulator/emulator"
 
+for tool in "$ADB" "$EMULATOR"; do
+  if [[ ! -x "$tool" ]]; then
+    echo "ERROR: Required tool not found: $tool"
+    echo "Set ANDROID_HOME or install the Android SDK."
+    exit 1
+  fi
+done
+
 AVD="${1:-Pixel-8a-API-35-x86}"   # pass an AVD name as $1 to override
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  EMULATOR_GPU=(-gpu auto)
+else
+  EMULATOR_GPU=(-gpu host)
+fi
 
 # Write local.properties so Gradle finds the SDK
 echo "sdk.dir=$ANDROID_SDK" > android/local.properties
@@ -16,7 +56,7 @@ echo "sdk.dir=$ANDROID_SDK" > android/local.properties
 # Boot the emulator if no device is currently online
 if ! "$ADB" devices | grep -q "emulator.*device"; then
   echo "==> Starting emulator: $AVD"
-  nohup "$EMULATOR" -avd "$AVD" -no-snapshot-save -gpu host > /tmp/emulator-"$AVD".log 2>&1 &
+  nohup "$EMULATOR" -avd "$AVD" -no-snapshot-save "${EMULATOR_GPU[@]}" > /tmp/emulator-"$AVD".log 2>&1 &
 
   echo "==> Waiting for emulator to come online…"
   "$ADB" wait-for-device
@@ -38,9 +78,9 @@ npm install --legacy-peer-deps
 # Linux where the default --terminal xterm-kitty isn't a real binary: execa
 # throws, the fallback runs Metro synchronously, and run-android never
 # reaches the Gradle build.
-if nc -z localhost 8081 2>/dev/null; then
+if port_in_use 8081; then
   echo "==> Killing existing Metro on :8081…"
-  fuser -k 8081/tcp 2>/dev/null || true
+  kill_port 8081
   sleep 1
 fi
 
@@ -48,7 +88,7 @@ echo "==> Starting Metro bundler (--reset-cache)…"
 npx react-native start --reset-cache > /tmp/metro.log 2>&1 &
 METRO_PID=$!
 echo "==> Waiting for Metro to accept connections on :8081…"
-until nc -z localhost 8081 2>/dev/null; do
+until port_in_use 8081; do
   sleep 1
   if ! kill -0 "$METRO_PID" 2>/dev/null; then
     echo "ERROR: Metro (PID $METRO_PID) exited before becoming ready. Check /tmp/metro.log"

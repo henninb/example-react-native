@@ -9,7 +9,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {fetchWeather, parseObservation, type Observation} from '../services/weatherService';
+import {
+  fetchWeather,
+  formatWeatherPayload,
+  parseObservation,
+  WEATHER_ALPHA_HOST,
+  WEATHER_HOST,
+  type Observation,
+  type WeatherFetchResult,
+} from '../services/weatherService';
 import {getWmoInfo} from '../models/wmoCodes';
 
 const COLORS = {
@@ -31,35 +39,56 @@ type LoadState = 'idle' | 'loading' | 'success' | 'error';
 
 export default function HomeScreen({onNavigateToRaw}: Props) {
   const [spoofUserAgent, setSpoofUserAgent] = useState(false);
+  const [useAlphaHost, setUseAlphaHost] = useState(false);
+  const [showPayload, setShowPayload] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [observation, setObservation] = useState<Observation | null>(null);
+  const [responsePayload, setResponsePayload] = useState<WeatherFetchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (spoof: boolean) => {
+  const load = useCallback(async (spoof: boolean, alphaHost: boolean) => {
     setLoadState('loading');
     setError(null);
     try {
-      const data = await fetchWeather(spoof);
-      const obs = parseObservation(data);
+      const result = await fetchWeather(spoof, alphaHost);
+      setResponsePayload(result);
+
+      if (!result.ok) {
+        setObservation(null);
+        setError(`HTTP ${result.status}`);
+        setLoadState('error');
+        return;
+      }
+
+      const obs = result.data ? parseObservation(result.data) : null;
       setObservation(obs);
       setLoadState('success');
     } catch (e) {
+      setResponsePayload(null);
       setError(e instanceof Error ? e.message : String(e));
       setLoadState('error');
     }
   }, []);
 
   useEffect(() => {
-    load(spoofUserAgent);
+    load(spoofUserAgent, useAlphaHost);
   }, []);
 
   const handleToggleSpoof = () => {
     const next = !spoofUserAgent;
     setSpoofUserAgent(next);
-    load(next);
+    load(next, useAlphaHost);
   };
 
-  const handleRefresh = () => load(spoofUserAgent);
+  const handleToggleAlphaHost = () => {
+    const next = !useAlphaHost;
+    setUseAlphaHost(next);
+    load(spoofUserAgent, next);
+  };
+
+  const handleRefresh = () => load(spoofUserAgent, useAlphaHost);
+
+  const activeHost = useAlphaHost ? WEATHER_ALPHA_HOST : WEATHER_HOST;
 
   const wmoInfo = observation ? getWmoInfo(observation.weatherCode) : null;
   const timeDisplay =
@@ -74,7 +103,7 @@ export default function HomeScreen({onNavigateToRaw}: Props) {
         </View>
         <View style={styles.domainRow}>
           <Text style={styles.domainCheck}>✓</Text>
-          <Text style={styles.domainLabel}>nextjs-website-alpha-weld.vercel.app</Text>
+          <Text style={styles.domainLabel}>{activeHost}</Text>
         </View>
         <Text style={styles.subtitle}>
           Live station observation
@@ -86,6 +115,18 @@ export default function HomeScreen({onNavigateToRaw}: Props) {
               {spoofUserAgent && <Text style={styles.checkmark}>✓</Text>}
             </View>
             <Text style={styles.toggleLabel}>UA: PhantomJS/react-native/brian (test)</Text>
+          </Pressable>
+          <Pressable style={styles.toggleRow} onPress={handleToggleAlphaHost}>
+            <View style={[styles.checkbox, useAlphaHost && styles.checkboxChecked]}>
+              {useAlphaHost && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.toggleLabel}>Override: {WEATHER_ALPHA_HOST}</Text>
+          </Pressable>
+          <Pressable style={styles.toggleRow} onPress={() => setShowPayload(current => !current)}>
+            <View style={[styles.checkbox, showPayload && styles.checkboxChecked]}>
+              {showPayload && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.toggleLabel}>Show response payload</Text>
           </Pressable>
         </View>
 
@@ -154,6 +195,25 @@ export default function HomeScreen({onNavigateToRaw}: Props) {
             <Text style={styles.mutedText}>No observations available</Text>
           )}
         </View>
+
+        {showPayload && responsePayload && (
+          <View style={styles.payloadSection}>
+            <Text style={styles.payloadTitle}>Response Payload</Text>
+            <Text style={styles.payloadMeta}>
+              HTTP {responsePayload.status}
+              {responsePayload.contentType ? ` · ${responsePayload.contentType}` : ''}
+            </Text>
+            {responsePayload.parseError && (
+              <Text style={styles.payloadHint}>{responsePayload.parseError}</Text>
+            )}
+            <ScrollView
+              horizontal
+              style={styles.payloadScroll}
+              contentContainerStyle={styles.payloadScrollContent}>
+              <Text style={styles.payloadText}>{formatWeatherPayload(responsePayload)}</Text>
+            </ScrollView>
+          </View>
+        )}
 
         <View style={styles.spacer} />
 
@@ -352,6 +412,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  payloadSection: {
+    marginTop: 16,
+  },
+  payloadTitle: {
+    fontSize: 12,
+    color: COLORS.muted,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  payloadMeta: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: COLORS.accent,
+    marginBottom: 8,
+  },
+  payloadHint: {
+    fontSize: 11,
+    color: COLORS.muted,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  payloadScroll: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    maxHeight: 220,
+  },
+  payloadScrollContent: {
+    padding: 12,
+  },
+  payloadText: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    color: '#CCDDEE',
+    lineHeight: 16,
   },
   spacer: {
     height: 24,

@@ -1,3 +1,5 @@
+import {fetchWithHumanChallenge} from './humanSecurity';
+
 export interface Observation {
   temp?: number;
   windChill?: number;
@@ -9,7 +11,23 @@ export interface Observation {
   obsTimeLocal?: string;
 }
 
-const WEATHER_URL = 'https://vercel.bhenning.com/api/weather';
+export const WEATHER_HOST = 'vercel.bhenning.com';
+export const WEATHER_ALPHA_HOST = 'nextjs-website-alpha-weld.vercel.app';
+
+export interface WeatherFetchResult {
+  status: number;
+  ok: boolean;
+  url: string;
+  contentType: string | null;
+  bodyText: string;
+  data: Record<string, unknown> | null;
+  parseError: string | null;
+}
+
+function weatherUrl(useAlphaHost = false): string {
+  const host = useAlphaHost ? WEATHER_ALPHA_HOST : WEATHER_HOST;
+  return `https://${host}/api/weather`;
+}
 
 // OkHttp strips User-Agent set from JS. Instead we send this sentinel header;
 // UserAgentInterceptor.kt swaps it for the real PhantomJS UA at the native layer.
@@ -21,43 +39,62 @@ function makeAbortSignal(ms: number): AbortSignal {
   return controller.signal;
 }
 
-export async function fetchWeather(spoofUserAgent = false): Promise<Record<string, unknown>> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  };
+export async function fetchWeather(
+  spoofUserAgent = false,
+  useAlphaHost = false,
+): Promise<WeatherFetchResult> {
+  const headers: Record<string, string> = {};
   if (spoofUserAgent) {
     headers[SPOOF_UA_SENTINEL] = '1';
   }
 
-  const response = await fetch(WEATHER_URL, {headers, signal: makeAbortSignal(30_000)});
+  const url = weatherUrl(useAlphaHost);
+  const fetched = await fetchWithHumanChallenge(url, headers, makeAbortSignal(30_000));
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+  let data: Record<string, unknown> | null = null;
+  let parseError: string | null = null;
+
+  try {
+    const parsed = JSON.parse(fetched.bodyText) as unknown;
+    if (Array.isArray(parsed)) {
+      data = {_list: parsed};
+    } else if (typeof parsed === 'object' && parsed !== null) {
+      data = parsed as Record<string, unknown>;
+    } else {
+      data = {_value: parsed};
+    }
+  } catch {
+    parseError = 'Response is not valid JSON';
   }
 
-  return response.json() as Promise<Record<string, unknown>>;
+  return {
+    status: fetched.status,
+    ok: fetched.ok,
+    url,
+    contentType: 'application/json',
+    bodyText: fetched.bodyText,
+    data,
+    parseError,
+  };
 }
 
 export async function fetchUrl(
   url: string,
   spoofUserAgent = false,
 ): Promise<Record<string, unknown>> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  };
+  const headers: Record<string, string> = {};
   if (spoofUserAgent) {
     headers[SPOOF_UA_SENTINEL] = '1';
   }
 
-  const response = await fetch(url, {headers, signal: makeAbortSignal(30_000)});
+  const fetched = await fetchWithHumanChallenge(url, headers, makeAbortSignal(30_000));
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+  if (!fetched.ok) {
+    throw new Error(`HTTP ${fetched.status}`);
   }
 
-  const text = await response.text();
   try {
-    const parsed = JSON.parse(text) as unknown;
+    const parsed = JSON.parse(fetched.bodyText) as unknown;
     if (Array.isArray(parsed)) {
       return {_list: parsed};
     }
@@ -82,6 +119,13 @@ export async function fetchPublicIp(): Promise<string> {
     throw new Error('IP lookup returned empty response');
   }
   return data.ip;
+}
+
+export function formatWeatherPayload(result: WeatherFetchResult): string {
+  if (result.data) {
+    return JSON.stringify(result.data, null, 2);
+  }
+  return result.bodyText;
 }
 
 export function parseObservation(data: Record<string, unknown>): Observation | null {
